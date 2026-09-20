@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://geekbird.net/sitemap.xml
+Sitemap: https://geekbird.org/sitemap.xml

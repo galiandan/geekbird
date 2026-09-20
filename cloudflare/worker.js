@@ -46,7 +46,7 @@ function validate(value, origin) {
     if (!link) continue;
     let url;
     try { url = new URL(link); } catch { throw new Error('请填写完整的 http:// 或 https:// 链接。'); }
-    if (!['http:', 'https:'].includes(url.protocol) || [new URL(origin).hostname, 'geekbird.net', 'www.geekbird.net'].includes(url.hostname) || url.username || url.password || link.length > 4096 || /\s/.test(link)) {
+    if (!['http:', 'https:'].includes(url.protocol) || [new URL(origin).hostname, 'geekbird.org', 'www.geekbird.org'].includes(url.hostname) || url.username || url.password || link.length > 4096 || /\s/.test(link)) {
       throw new Error('请使用外部平台的 HTTP(S) 链接，不要包含账号密码。');
     }
   }

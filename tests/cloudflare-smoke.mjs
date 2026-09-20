@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 const base = 'http://127.0.0.1:8788';
 const auth = 'Basic ' + Buffer.from('admin:local-test-password-only').toString('base64');
 const hash = data => createHash('sha256').update(data).digest('hex');
-for (const [route, name] of [['/', 'index.html'], ['/service/', 'service/index.html'], ['/booking/', 'booking/index.html'], ['/assets/app.js', 'assets/app.js']]) {
+for (const [route, name] of [['/', 'index.html'], ['/service/', 'service/index.html'], ['/disclaimer/', 'disclaimer/index.html'], ['/booking/', 'booking/index.html'], ['/assets/app.js', 'assets/app.js']]) {
   const result = await fetch(base + route);
   assert.equal(result.status, 200, route);
   assert.equal(hash(Buffer.from(await result.arrayBuffer())), hash(await readFile(new URL('../dist/cloudflare/' + name, import.meta.url))), route);
@@ -44,6 +44,6 @@ try {
 } finally {
   assert.equal((await save(original)).status, 200, 'Restore local test configuration');
 }
-assert.match(await (await fetch(base + '/sitemap.xml')).text(), /https:\/\/geekbird.net\/booking\//);
+assert.match(await (await fetch(base + '/sitemap.xml')).text(), /https:\/\/geekbird\.org\/disclaimer\//);
 assert.ok(!(await (await fetch(base + '/robots.txt')).text()).includes('_gb-settings'));
 console.log('Cloudflare runtime verified: static assets, 404, private routes, headers, local KV writes and public configuration.');

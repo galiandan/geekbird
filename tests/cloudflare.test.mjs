@@ -88,7 +88,7 @@ test('invalid input and cross-origin writes do not change saved configuration', 
   await save(env, config);
   for (const change of [{ emergencyQQ: '01234' }, { emergencyQQ: 12345 }, { bookingUrl: 'javascript:alert(1)' },
     { bookingUrl: origin + '/booking/' }, { bookingUrl: 'http://example.pages.dev/booking/' },
-    { bookingUrl: 'https://geekbird.net/booking/' }, { bookingUrl: 'https://www.geekbird.net/booking/' },
+    { bookingUrl: 'https://geekbird.org/booking/' }, { bookingUrl: 'https://www.geekbird.org/booking/' },
     { bookingUrl: 'https://user:pass@example.org/' }]) {
     assert.equal((await save(env, { ...config, ...change })).status, 400);
   }

@@ -1,15 +1,16 @@
 # VPS 管理后台部署记录
 
-2026-09-19 已在原 VPS `47.120.64.37` 部署包含管理后台的版本。
+2026-09-20 已在 VPS `47.120.64.37` 部署最新页面与管理后台，包含第三页免责声明。
 
 ## 访问
 
 - 网站：<https://47.120.64.37/>。
+- 免责声明：<https://47.120.64.37/disclaimer/>。
 - 原地址继续可用：<http://47.120.64.37:54321/>。
 - 管理后台：<https://47.120.64.37/_gb-settings/>。
 - 用户名：`admin`；密码为部署时单独设置的管理密码，不记录在仓库中。
 
-原 HTTP 地址上的管理路径会跳到 HTTPS，登录信息通过加密连接传输。IP 地址使用 Let's Encrypt 签发的受信任证书。正式域名仍预定为 `geekbird.net`，绑定完成前使用上面的 IP 地址。
+原 HTTP 地址上的管理路径会跳到 HTTPS，登录信息通过加密连接传输。IP 地址使用 Let's Encrypt 签发的受信任证书。官网现已在 <https://geekbird.org/> 正式上线；上面的 IP 地址为历史 VPS 部署地址。
 
 ## VPS 与 Cloudflare 的区别
 
@@ -27,12 +28,32 @@ VPS 后台无需 Cloudflare KV 或环境变量 `ADMIN_PASSWORD`，通过 Python 
 
 ## 本次发布与回滚
 
-- 发布目录：`/var/www/geekbird/releases/20260919-121854-admin`。
-- 上一版：`/var/www/geekbird/releases/20260919-075312-typography/public`。
-- 发布前备份：`/var/backups/geekbird-before-admin-20260919-121600.tar.gz`。
-- 本次发布目录中保留 `previous-public.txt` 与 `previous-nginx.conf`。
+2026-09-20 08:27（北京时间）已移除所有页面主导航中的“关于”入口，导航现在为首页、服务、免责声明。
 
-回滚到之前的静态版本时，恢复 `previous-nginx.conf`，把 `public` 链接切回 `previous-public.txt` 中的目录，执行 `nginx -t` 后重载 Nginx；确认静态网站正常后可停止后台服务。保留 `/var/lib/geekbird`，避免丢失已经保存的配置。
+- 当前网站：`/var/www/geekbird/releases/20260920-002710-navigation/public`。
+- 当前后台：`/var/www/geekbird/releases/20260920-002320-disclaimer/server`。
+- 上一版网站：`/var/www/geekbird/releases/20260920-002320-disclaimer/public`。
+- 发布前备份：`/var/backups/geekbird-before-navigation-20260920-002710.tar.gz`。
+- 静态发布包 SHA-256：`0421af69d4edd2b3c8083a4514056b51bbb6330f71014e78c156d65f808c11a3`。
+
+本次只切换公开网站目录，后台服务、业务配置与密码保持原样。HTTPS 与原 HTTP 地址下的四个页面均已核对文件哈希及导航内容。回滚此次导航修改，只需将 `public` 链接切回上述上一版网站目录。
+
+### 免责声明与后台升级记录
+
+2026-09-20 08:23（北京时间）发布：
+
+- 发布目录：`/var/www/geekbird/releases/20260920-002320-disclaimer`。
+- 上一版网站：`/var/www/geekbird/releases/20260919-121854-admin/public`。
+- 上一版后台：`/var/www/geekbird/releases/20260919-121854-admin/server`。
+- 发布前备份：`/var/backups/geekbird-before-disclaimer-20260920-002320.tar.gz`，包含网站、后台状态、Nginx 与服务配置，仅 root 可读。
+- 发布包 SHA-256：`a72d82b03750e8029afad1a66b9d104d7fc7bf4ddaf171786131bc798dffdd6c`。
+- 发布目录保留 `previous-public.txt`、`previous-server.txt`、`previous-nginx.conf`、`manifest.json` 与 `deployment.json`，均位于公开目录之外。
+
+本次同步升级了支持反馈链接的后台，将仍为旧默认公众号地址的预约配置迁移到问卷星预约表单，并为缺少反馈字段的旧配置补充反馈表单。QQ 与管理密码保持原样。
+
+已验证 HTTPS 证书、18 个公开页面与资源的 SHA-256、两种访问地址下的页面和跳转、实时配置、后台认证保护及私有文件隔离；桌面与手机浏览器确认导航、免责声明、阅读锚点和外部表单链接正常。
+
+回滚代码时，将 `public`、`current-server` 链接分别切回两个 `previous-*.txt` 记录的目录，恢复 `previous-nginx.conf`，执行 `nginx -t` 后重载 Nginx，并重启 `geekbird-admin`。页面回滚不会自动回滚业务配置；如需恢复本次迁移前的配置，可从上述备份取回 `/var/lib/geekbird/config.json`，恢复后保留 `geekbird` 用户所有权和原权限。管理密码文件无需变更。
 
 ## 证书自动续期
 

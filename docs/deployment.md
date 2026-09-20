@@ -1,6 +1,6 @@
 # 正式部署与维护
 
-> 当前 VPS 已部署可管理 QQ 与预约链接的版本，访问地址和服务维护见 [VPS 部署记录](vps.md)。
+> 官网已在 <https://geekbird.org/> 正式上线。历史 VPS 访问地址和服务维护见 [VPS 部署记录](vps.md)。
 
 > Cloudflare Pages 和浏览器管理后台请使用 [Cloudflare 部署说明](cloudflare.md)。下文保留原 Nginx 静态部署流程，该流程不提供管理后台。
 
@@ -22,7 +22,7 @@
 python3 scripts/release.py
 ```
 
-输出 `dist/geekbird-site.tar.gz`、`dist/manifest.json`、`dist/SHA256SUMS`。压缩包解开后是 `public/`，共 18 个文件。每次修改配置、页面或图片后重新打包。新增中文文案时，先运行 `python3 scripts/subset_fonts.py` 更新本地字体子集；字体许可文件随包分发。只有格式整理或文件相同的重复打包会得到相同的校验值。
+输出 `dist/geekbird-site.tar.gz`、`dist/manifest.json`、`dist/SHA256SUMS`。压缩包解开后是 `public/`，包含三个主页面、旧预约兼容页与静态资源。每次修改配置、页面或图片后重新打包。新增中文文案时，先运行 `python3 scripts/subset_fonts.py` 更新本地字体子集；字体许可文件随包分发。只有格式整理或文件相同的重复打包会得到相同的校验值。
 
 上传到服务器的临时接收目录：
 

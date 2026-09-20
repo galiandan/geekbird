@@ -82,7 +82,7 @@
 
 1. 生成后，保留高清原图在站点之外，导出上述三个同名 WebP 并覆盖项目根目录下的 `assets/images/` 中对应文件。
 2. 无需修改 HTML。刷新后查看 1440px 桌面和 390px 手机视口，确认鸟、光井和笔记本未被裁出画面。
-3. 新图构图如与占位图不同，在 `assets/style.css` 中调整对应 `.hero-home .hero-art`、`.hero-service .hero-art`、`.hero-booking .hero-art` 的 `background-position` / `background-size`。手机构图在 `@media(max-width:650px)` 中单独调整。
+3. 新图构图如与占位图不同，在 `assets/style.css` 中调整对应 `.hero-home .hero-art`、`.hero-service .hero-art`、`.hero-architecture .hero-art` 的 `background-position` / `background-size`。手机构图在 `@media(max-width:650px)` 中单独调整。
 4. 网页已用透明遮罩完成左文右图衔接，请不要在生成图里额外放文字或绘制按钮。本轮已按正式图精调遮罩位置和曝光。后续换图时请同步检查 `-mobile.webp` 与 CSS 中的资源版本号。
 
 ## 项目路径

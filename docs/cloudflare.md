@@ -1,8 +1,8 @@
 # Cloudflare Pages 部署与后台管理
 
-此版本使用 Cloudflare Pages 的 Worker 和 KV，不需要自己的服务器、SSH 或数据库。公开官网保持原来的三个页面。
+此版本使用 Cloudflare Pages 的 Worker 和 KV，不需要自己的服务器、SSH 或数据库。官网主页面为首页、服务页与免责声明，旧预约地址保留兼容。
 
-正式域名预先登记为 <https://geekbird.net/>。在 Pages 项目的 **Custom domains（自定义域）** 中添加 `geekbird.net`，按提示配置 DNS，并等待 HTTPS 生效。
+官网已正式上线：<https://geekbird.org/>。正式域名为 `geekbird.org`；新建或迁移 Pages 项目时，在 **Custom domains（自定义域）** 中配置此域名。
 
 ## 首次部署（Cloudflare 控制台）
 
@@ -20,7 +20,7 @@
 
 运行 `python3 scripts/cloudflare.py` 会生成：
 
-- `dist/cloudflare/`：Pages 构建输出，共 24 个文件。
+- `dist/cloudflare/`：Pages 构建输出，包含三个主页面与旧预约地址兼容页。
 - `dist/geekbird-cloudflare-pages.zip`：同一目录内容的压缩包，解压后 `_worker.js` 位于根层。
 - `dist/cloudflare-manifest.json`：每个上线文件的 SHA-256。
 - `dist/cloudflare-SHA256SUMS`：压缩包和文件清单的校验值。
@@ -31,12 +31,12 @@
 
 ## 打开后台
 
-- 地址：<https://geekbird.net/_gb-settings/>；域名绑定完成前，可使用 Pages 分配的 `*.pages.dev` 域名访问同一路径。
+- 地址：<https://geekbird.org/_gb-settings/>；域名绑定完成前，可使用 Pages 分配的 `*.pages.dev` 域名访问同一路径。
 - 浏览器会弹出身份验证窗口，用户名填 `admin`，密码填上面设置的 `ADMIN_PASSWORD`。
 - 页面与读写接口都在服务端校验密码，公开导航没有后台链接；后台响应禁止缓存和搜索收录。
 - 只能通过 HTTPS 在线管理。建议在个人浏览器或独立隐私窗口操作；Basic 身份验证由浏览器暂存，使用完关闭整个隐私窗口。更换密码需在 Cloudflare 更新 Secret 并重新部署。
 
-输入 QQ 号与完整的 HTTP(S) 预约链接，点击“保存设置”。允许留空：QQ 留空时显示“QQ 号暂未公布”，预约链接留空时暂停入口。保存失败会明确提示，不会显示保存成功。
+输入 QQ 号与完整的 HTTP(S) 预约、反馈链接，点击“保存设置”。允许留空：QQ 留空时显示“QQ 号暂未公布”，预约或反馈链接留空时暂停对应入口。保存失败会明确提示，不会显示保存成功。
 
 KV 在全球各地区最终一致，通常约 60 秒、部分地区可能更久；保存后稍后刷新公开网站验证。不要多人同时修改：最后一次成功写入覆盖之前的配置。
 
@@ -62,23 +62,23 @@ KV 在全球各地区最终一致，通常约 60 秒、部分地区可能更久�
 
 ## 从 VPS 切换与上线验收
 
-1. 在 `*.pages.dev` 地址确认首页、服务页、预约页和图片正常；预约和服务反馈按钮直接进入对应外部表单。
+1. 在 `*.pages.dev` 地址确认首页、服务页、免责声明、旧预约地址和图片正常；预约和服务反馈按钮直接进入对应外部表单。
 2. 核对原 VPS 的 QQ 和预约链接。在 Pages 后台填写并保存，稍后刷新公开页面验证。VPS 的磁盘配置、密码不会自动导入 Cloudflare；源码默认值仅在 KV 尚未保存时使用。
 3. 用未登录的隐私窗口检查 `/_gb-settings/` 和 `/_gb-settings/api` 均要求身份验证。`/README.md`、`/server/admin.py` 和随机未知路径应返回 404。
-4. 在 Pages **Custom domains** 添加 `geekbird.net`。若域名原有指向 VPS 的记录，按 Pages 提示替换对应记录；等待域名验证及 HTTPS 完成。
-5. 在 `https://geekbird.net` 再次检查页面、后台登录与保存。初次切换可能需要在新域名重新登录。
+4. 在 Pages **Custom domains** 添加 `geekbird.org`。若域名原有指向 VPS 的记录，按 Pages 提示替换对应记录；等待域名验证及 HTTPS 完成。
+5. 在 `https://geekbird.org` 再次检查页面、后台登录与保存。初次切换可能需要在新域名重新登录。
 6. 验收完成前保留原 VPS。回滚 Pages 部署只回滚代码，不回滚 KV；如需恢复旧配置，在后台重新填写。
 
-源码 canonical 和站点地图使用 `https://geekbird.net`。后台地址不出现在公开导航、`robots.txt` 或站点地图中，通过密码验证和 `noindex` 响应保护。
+源码 canonical 和站点地图使用 `https://geekbird.org`。后台地址不出现在公开导航、`robots.txt` 或站点地图中，通过密码验证和 `noindex` 响应保护。
 
 ## 本地检查
 
 ```sh
 python3 scripts/cloudflare.py
-node --test tests/cloudflare.test.mjs
+node --test tests/*.test.mjs
 ```
 
-构建仅依赖 Python 3；接口测试需要 Node.js 22 或以上。9 项测试覆盖构建文件保护、密码保护、配置保存与读取、非法输入、跨站写入拦截、KV 故障和损坏配置。后台 HTML 内嵌于 Worker，不单独公开。
+构建仅依赖 Python 3；接口测试需要 Node.js 22 或以上。测试覆盖预约和反馈链接、构建文件保护、密码保护、配置保存与读取、非法输入、跨站写入拦截、KV 故障和损坏配置。后台 HTML 内嵌于 Worker，不单独公开。
 
 可使用 Wrangler 在本地 Cloudflare 运行环境启动，下面的密码仅用于本地测试：
 

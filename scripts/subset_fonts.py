@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Refresh self-hosted font subsets after editing Chinese copy. Network needed only here."""
 from html.parser import HTMLParser
-from pathlib import Path
+import hashlib
 import re
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-ROOT = Path(__file__).resolve().parent.parent
+from release import PAGES, ROOT
 UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
 
@@ -26,7 +26,7 @@ def fetch(url):
 
 def main():
     content = Text()
-    for name in ['index.html', 'service/index.html', 'booking/index.html']:
+    for name in PAGES:
         content.feed((ROOT / name).read_text(encoding='utf-8'))
     text = ''.join(content.parts) + (ROOT / 'assets/app.js').read_text(encoding='utf-8')
     chinese = ''.join(sorted({char for char in text if ord(char) > 127}))
@@ -48,11 +48,18 @@ def main():
         license_text = fetch(f'https://raw.githubusercontent.com/google/fonts/main/ofl/{license_folder}/OFL.txt')
         assert b'SIL OPEN FONT LICENSE' in license_text
         (folder / f'{slug}.woff2').write_bytes(font)
+        version = hashlib.sha256(font).hexdigest()[:12]
+        if slug == 'noto-sans-sc':
+            for name in PAGES:
+                page = ROOT / name
+                page.write_text(re.sub(r'/assets/fonts/noto-sans-sc\.woff2(?:\?v=[^"]+)?',
+                                       f'/assets/fonts/noto-sans-sc.woff2?v={version}',
+                                       page.read_text(encoding='utf-8')), encoding='utf-8')
         (folder / f'{slug}-OFL.txt').write_bytes(license_text)
         ranges = re.findall(r'unicode-range:\s*([^;]+);', css)
         range_rule = f'\n  unicode-range: {ranges[0]};' if ranges else ''
         low, *_, high = weights.split(';')
-        css_parts.append(f"@font-face {{\n  font-family: '{family}';\n  font-style: normal;\n  font-weight: {low} {high};\n  font-display: swap;\n  src: url('/assets/fonts/{slug}.woff2') format('woff2');{range_rule}\n}}")
+        css_parts.append(f"@font-face {{\n  font-family: '{family}';\n  font-style: normal;\n  font-weight: {low} {high};\n  font-display: swap;\n  src: url('/assets/fonts/{slug}.woff2?v={version}') format('woff2');{range_rule}\n}}")
         print(f'{family}: {len(chars)} characters; {len(font):,} bytes')
     (folder / 'fonts.css').write_text('\n\n'.join(css_parts) + '\n', encoding='utf-8')
 

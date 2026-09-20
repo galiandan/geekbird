@@ -11,7 +11,7 @@ import tarfile
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
-PAGES = ("index.html", "service/index.html", "booking/index.html")
+PAGES = ("index.html", "service/index.html", "disclaimer/index.html", "booking/index.html")
 FILES = (*PAGES, "config.js", "assets/app.js", "assets/style.css", "assets/logo.svg",
          "assets/images/feathers.webp", "assets/images/feathers-mobile.webp",
          "assets/images/landscape.webp", "assets/images/landscape-mobile.webp",

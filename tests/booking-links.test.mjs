@@ -15,7 +15,7 @@ test('default reservation goes straight to the booking form', () => {
   assert.equal(context.window.GEEKBIRD_CONFIG.feedbackUrl, feedback);
 });
 
-for (const file of ['index.html', 'service/index.html', 'booking/index.html']) {
+for (const file of ['index.html', 'service/index.html', 'disclaimer/index.html', 'booking/index.html']) {
   test(`${file} exposes direct booking and feedback links without an intermediate page`, () => {
     const html = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
     const anchors = html.match(/<a\b[^>]*>/g);
