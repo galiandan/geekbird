@@ -40,7 +40,7 @@ py = str(release / 'venv/bin/python')
 previous = str((base / 'current').resolve()) if (base / 'current').exists() else ''
 (release / 'previous-release.txt').write_text(previous + '\n')
 for user, folder, allowed in [
-    ('geekbird-api', 'geekbird-api', 'https://geekbird.org'),
+    ('geekbird-api', 'geekbird-api', 'https://geekbird.org,https://47.120.64.37'),
     ('geekbird-preview', 'geekbird-preview', 'https://feat-self-hosted-booking-backend.geekbird.pages.dev,https://feat-self-hosted-booking-back.geekbird.pages.dev')]:
     try: account = pwd.getpwnam(user)
     except KeyError:

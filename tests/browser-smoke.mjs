@@ -6,7 +6,8 @@ const { chromium } = await import(process.env.GEEKBIRD_PLAYWRIGHT_MODULE || 'pla
 const base = process.env.GB_BROWSER_BASE || 'http://127.0.0.1:8800';
 const api = process.env.GB_BROWSER_API || 'http://127.0.0.1:8790';
 const apiPrefix = process.env.GB_BROWSER_PREFIX || '';
-if (!base.startsWith('http://127.0.0.1:') && !(base.endsWith('.geekbird.pages.dev') && apiPrefix === '/_gb-preview')) throw new Error('Use a local or isolated preview environment only.');
+const liveVps = process.env.GB_BROWSER_LIVE_VPS === '1' && base === 'https://47.120.64.37' && api === base && apiPrefix === '' && !process.env.GB_BROWSER_ASSETS;
+if (!liveVps && !base.startsWith('http://127.0.0.1:') && !(base.endsWith('.geekbird.pages.dev') && apiPrefix === '/_gb-preview')) throw new Error('Use a local/preview environment, or explicitly select the live VPS smoke test.');
 const password = process.env.GB_BROWSER_PASSWORD_FILE ? (await readFile(process.env.GB_BROWSER_PASSWORD_FILE, 'utf8')).trim() : 'local-browser-password-only';
 const auth = 'Basic ' + Buffer.from('admin:' + password).toString('base64');
 const adminBase = api + apiPrefix + '/_gb-data';
@@ -39,7 +40,8 @@ async function admin(path, method = 'GET', data) {
 async function ready() { await page.locator('form[data-service-form] > fieldset').waitFor(); await page.waitForFunction(() => !document.querySelector('form[data-service-form] > fieldset').disabled); }
 try {
   const before = (await admin('bookings')).total;
-  await page.goto(base + '/booking/'); await ready();
+  await page.goto(liveVps ? 'http://47.120.64.37:54321/booking/' : base + '/booking/'); await ready();
+  if (liveVps) assert.equal(page.url(), base + '/booking/');
   await page.locator('[name=name]').fill(person); await page.locator('[name=gradeMajor]').fill('测试专业');
   await page.locator('[name=qq]').fill('12345678'); await page.locator('[name=device]').fill('测试设备');
   await page.locator('[name=os]').fill('测试系统'); await page.locator('[name=issue]').fill('功能验收使用的虚构故障描述');
@@ -90,16 +92,18 @@ try {
   await dashboard.locator('#close-detail').click();
   const downloadPromise = dashboard.waitForEvent('download'); await dashboard.locator('#export').click(); const download = await downloadPromise;
   assert.equal(await download.failure(), null);
-  const current = await admin('settings');
-  try {
-    await admin('settings', 'PATCH', { ...current, acceptingBookings: false });
-    await page.goto(base + '/booking/');
-    await page.waitForFunction(() => !document.querySelector('#retry-connection').hidden);
-    assert.ok(await page.getByRole('button', { name: '提交预约' }).isDisabled());
-  } finally {
-    const latest = await admin('settings'); await admin('settings', 'PATCH', { ...current, version: latest.version });
+  if (!liveVps) {
+    const current = await admin('settings');
+    try {
+      await admin('settings', 'PATCH', { ...current, acceptingBookings: false });
+      await page.goto(base + '/booking/');
+      await page.waitForFunction(() => !document.querySelector('#retry-connection').hidden);
+      assert.ok(await page.getByRole('button', { name: '提交预约' }).isDisabled());
+    } finally {
+      const latest = await admin('settings'); await admin('settings', 'PATCH', { ...current, version: latest.version });
+    }
   }
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ result: 'passed', booking: reference, feedback: feedbackRef, checks: 'desktop, mobile, lost reply retry, admin workflow, confirmed hours, CSV, closed state', screenshots: output }));
+  console.log(JSON.stringify({ result: 'passed', booking: reference, feedback: feedbackRef, checks: 'desktop, mobile, lost reply retry, admin workflow, confirmed hours, CSV, ' + (liveVps ? 'HTTP to HTTPS redirect' : 'closed state'), screenshots: output }));
   await staff.close();
 } finally { await context.close(); await browser.close(); }

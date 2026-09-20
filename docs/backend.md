@@ -4,7 +4,7 @@
 
 ## 当前部署状态
 
-2026-09-20，已通过 SSH key 将 API 部署到 `47.120.64.37`。正式前端仍以当前 Pages 生产部署为准；本分支尚需通过 Pages 生产切换才能替换官网外部问卷入口。
+2026-09-20，VPS 已部署完整站点、配置后台与业务 API。访问 <https://47.120.64.37/> 即可使用站内预约和反馈，数据写入正式 SQLite。Cloudflare 的 `geekbird.org` 仍以原生产部署为准，后续再切换。
 
 本次发布目录为 `/opt/geekbird-api/releases/20260920T010801Z`，上一版为 `20260920T010613Z`。29 项业务 API 测试、25 项前端/Worker 测试、5 项 VPS 配置测试通过；本地和真实远端 HTTPS 的桌面/手机浏览器流程均已验收。IP 证书的 `certbot renew --dry-run` 成功，实际每日备份与完整性检查已执行。
 
@@ -17,9 +17,9 @@
 | 系统用户 | `geekbird-api` | `geekbird-preview` |
 | 数据目录 | `/var/lib/geekbird-api` | `/var/lib/geekbird-preview` |
 | 配置目录 | `/etc/geekbird-api` | `/etc/geekbird-preview` |
-| 接收状态 | 首次上线保持关闭，切换官网前核对并开放 | 已开放，限虚构测试资料 |
+| 接收状态 | 已开放预约和反馈，支持 VPS HTTPS 站点 | 已开放，限虚构测试资料 |
 
-原 `geekbird-admin` 配置服务仍使用 8765。现有 VPS 静态站和 Cloudflare 生产页面不通过本次 API 部署自动升级。
+VPS 网站发布目录为 `/var/www/geekbird/releases/20260920T023735Z-self-hosted`，`public` 与 `current-server` 链接已同步切换。`geekbird-admin` 仍使用 8765，已升级为新版 QQ 设置和业务工作台入口。旧 `http://47.120.64.37:54321/` 地址对 GET/HEAD 转向 HTTPS，拒绝明文写入。
 
 数据库文件名均为 `geekbird.sqlite3`，父目录权限 0700。初次部署生成独立的 `admin` 账号密码，保存在各配置目录下的 `credential.password`，仅 root 可读。应用只读取 `credential.json` 中的带盐 scrypt 摘要。密码文件不进 Git，也不在管理页面显示。
 
@@ -41,7 +41,7 @@
 GB_DATABASE=/var/lib/geekbird-api/geekbird.sqlite3
 GB_CREDENTIAL=/etc/geekbird-api/credential.json
 GB_ADMIN_ORIGIN=https://47.120.64.37
-GB_ALLOWED_ORIGINS=https://geekbird.org
+GB_ALLOWED_ORIGINS=https://geekbird.org,https://47.120.64.37
 ```
 
 预览环境使用自己的路径和明确的 Pages 分支 origin，正式环境不允许 Pages 预览或本地来源。配置修改后重启相应服务。CORS 的 Nginx map 也需同步更改；不要加入通配域。
@@ -79,6 +79,22 @@ npx playwright install chromium
 - 桌面和手机表单、后台处理、时长核实、下载和暂停提示。
 
 `tests/browser-smoke.mjs` 也支持连接隔离的远端预览 API。设置 `GB_BROWSER_ASSETS` 时，它在浏览器内提供本地构建资源，以验证真实 HTTPS 和跨域提交；这种验收不是 Cloudflare 发布，不能把该测试 origin 宣称为已上线预览地址。
+
+## VPS 完整站点部署
+
+已有 API 时，在本地执行：
+
+```sh
+python3 scripts/deploy_vps.py
+```
+
+脚本校验发布包和所有上线静态文件的哈希，备份旧网站、配置服务、Nginx 与业务数据库，同步切换网站和配置服务；失败时恢复原链接、配置与接收开关。首次迁移根据旧外部入口是否开放来初始化业务开关，保存 v2 站点配置；后续发布保留管理员设置，不重新开放已暂停的入口。
+
+本次站点备份：`/var/backups/geekbird-before-vps-20260920T023735Z.tar.gz`。数据库迁移前快照：`/var/backups/geekbird-api/before-deploy/geekbird-20260920T023735636180Z.sqlite3`。原公开目录与配置服务目录分别为 `20260920-002710-navigation/public`、`20260920-002320-disclaimer/server`，均位于 `/var/www/geekbird/releases/` 下。
+
+已在真实 VPS 页面完成桌面预约、手机反馈、丢失回执重试、工作台状态更新、确认时长和 CSV 下载验收。五个页面与发布清单哈希一致，私有文件返回 404，两个后台均要求登录；原 QQ 与配置后台密码保留。本次创建的两条明确标记的验收记录已按编号清理。
+
+完整站点验收显式设置 `GB_BROWSER_LIVE_VPS=1`，直接访问真实 VPS 页面。它只新增带“验收测试”标记的记录，不暂停正式接收；验收后按返回编号清理这些测试记录。默认浏览器测试仍只允许本地或隔离预览。
 
 ## 后端部署
 
@@ -151,4 +167,4 @@ venv/bin/python -m api.manage purge
 3. 用独立预览验收后发布本分支前端，确认其 `apiBaseUrl` 指向正式 API，页面没有测试提示。
 4. 在官网提交明确标记的测试记录并核对后台，检查所有旧外链入口、页面说明与失败提示。历史问卷答卷单独保留或另行导入。
 
-截至本次后端部署，正式 API 接收仍关闭，源码和发布包已具备切换能力；Git 分支 push 与 Pages 正式发布是两个独立结果。
+VPS 完整站点已正常接收预约和反馈；Cloudflare 正式页面仍需按上述步骤单独切换。Git 分支 push 与 Pages 正式发布是两个独立结果。

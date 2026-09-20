@@ -143,7 +143,7 @@ def create_app(database=None, credential=None, admin_origin=None, origins=None):
     if len(bytes.fromhex(credential['salt'])) != 16 or len(bytes.fromhex(credential['digest'])) != 64:
         raise ValueError('Invalid administrator credential')
     admin_origin = admin_origin or os.environ.get('GB_ADMIN_ORIGIN', 'https://47.120.64.37')
-    origins = origins if origins is not None else os.environ.get('GB_ALLOWED_ORIGINS', 'https://geekbird.org').split(',')
+    origins = origins if origins is not None else os.environ.get('GB_ALLOWED_ORIGINS', 'https://geekbird.org,https://47.120.64.37').split(',')
     for origin in [admin_origin, *origins]:
         parsed = urlsplit(origin)
         if (parsed.scheme not in ('http', 'https') or not parsed.netloc or parsed.path or parsed.query or parsed.fragment

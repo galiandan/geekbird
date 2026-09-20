@@ -24,3 +24,4 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: python tests/run_browser.py
       - run: python scripts/api.py
+      - run: python scripts/vps.py
