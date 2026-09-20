@@ -14,8 +14,8 @@ from . import db
 
 
 def credential(password):
-    if len(password) < 16:
-        raise ValueError('Use a password with at least 16 characters.')
+    if len(password) < 6:
+        raise ValueError('Use a password with at least 6 characters.')
     salt = secrets.token_bytes(16)
     return {'salt': salt.hex(), 'digest': hashlib.scrypt(password.encode(), salt=salt, n=16384, r=8, p=1).hex()}
 

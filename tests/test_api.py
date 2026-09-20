@@ -1,5 +1,6 @@
 """Exercise the real ASGI app, transactions and backup without production data."""
 import base64
+import hashlib
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
@@ -201,3 +202,10 @@ def test_backup_retention_covers_manual_snapshots(service, tmp_path):
     current = backup(database, folder / 'daily')
     prune_backups(folder)
     assert not old.exists() and current.exists()
+
+
+def test_password_minimum_six_characters():
+    with pytest.raises(ValueError, match='at least 6'):
+        credential('abc12')
+    value = credential('abc123')
+    assert value['digest'] == hashlib.scrypt(b'abc123', salt=bytes.fromhex(value['salt']), n=16384, r=8, p=1).hex()
