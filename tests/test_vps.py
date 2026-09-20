@@ -17,7 +17,7 @@ class SettingsTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.path = Path(self.temp.name) / 'config.json'
-        self.initial = {'emergencyQQ': '123456789', 'bookingUrl': 'https://example.org/book', 'feedbackUrl': 'https://example.org/feedback'}
+        self.initial = {'schemaVersion': 2, 'emergencyQQ': '123456789'}
         admin.write_config(self.path, self.initial)
         self.auth = 'Basic ' + base64.b64encode(b'admin:test-password-only').decode()
         self.server = admin.create_server(('127.0.0.1', 0), self.path, '<html>Settings</html>',
@@ -49,46 +49,35 @@ class SettingsTest(unittest.TestCase):
             self.assertEqual(self.request(path, **{'X-Forwarded-Proto': 'http'})[0], 403)
         self.assertEqual(self.request('/_gb-settings/')[0], 200)
 
-    def test_persistence_public_config_and_blank(self):
-        value = {'emergencyQQ': '987654321', 'bookingUrl': 'https://example.org/new', 'feedbackUrl': 'https://example.org/new-feedback'}
+    def test_persistence_and_public_config(self):
+        value = {'schemaVersion': 2, 'emergencyQQ': '987654321'}
         self.assertEqual(self.request(method='PUT', data=value)[0], 200)
         self.assertEqual(json.loads(self.path.read_text()), value)
         status, body, headers = self.request('/config.js', Authorization='')
         self.assertEqual(status, 200)
         self.assertIn(b'987654321', body)
+        self.assertIn(b'/booking/', body)
         self.assertEqual(headers['Cache-Control'], 'no-store')
-        self.assertEqual(self.request(method='PUT', data={'emergencyQQ': '', 'bookingUrl': '', 'feedbackUrl': ''})[0], 200)
+        self.assertEqual(self.request(method='PUT', data={'schemaVersion': 2, 'emergencyQQ': ''})[0], 200)
 
-    def test_invalid_and_cross_site_writes(self):
-        for value in ({'emergencyQQ': '01234', 'bookingUrl': ''},
-                      {'emergencyQQ': '', 'bookingUrl': 'javascript:alert(1)'},
-                      {'emergencyQQ': '', 'bookingUrl': 'https://example.com/booking/'},
-                      {'emergencyQQ': '', 'bookingUrl': 'https://example.org:bad/'},
-                      {'emergencyQQ': '', 'bookingUrl': 'https://user:password@example.org/'}, []):
-            self.assertEqual(self.request(method='PUT', data={**self.initial, **value} if isinstance(value, dict) else value)[0], 400)
+    def test_invalid_stale_and_cross_site_writes(self):
+        for value in ({'schemaVersion': 2, 'emergencyQQ': '01234'},
+                      {'emergencyQQ': '123456789', 'bookingUrl': '', 'feedbackUrl': ''},
+                      {'schemaVersion': 2, 'emergencyQQ': '', 'apiBaseUrl': 'https://evil.example'}, []):
+            self.assertEqual(self.request(method='PUT', data=value)[0], 400)
         self.assertEqual(self.request(method='PUT', data=self.initial, Origin='https://evil.example')[0], 403)
         self.assertEqual(json.loads(self.path.read_text()), self.initial)
 
-    def test_feedback_validation(self):
-        for feedback in (None, 123, 'javascript:alert(1)', 'https://example.com/feedback/',
-                         'https://user:pass@example.org/', 'https://example.org:bad/',
-                         'https://example.org/with space'):
-            self.assertEqual(self.request(method='PUT', data={**self.initial, 'feedbackUrl': feedback})[0], 400)
-        self.assertEqual(json.loads(self.path.read_text()), self.initial)
-
-    def test_legacy_feedback_and_public_whitelist(self):
-        legacy = {k: v for k, v in self.initial.items() if k != 'feedbackUrl'}
-        admin.write_config(self.path, {**legacy, 'privateNote': 'do-not-publish'})
+    def test_legacy_public_projection(self):
+        admin.write_config(self.path, {'emergencyQQ': '123456789', 'bookingUrl': 'https://www.wjx.top/old', 'privateNote': 'private-marker'})
         status, body, _ = self.request()
         self.assertEqual(status, 200)
-        self.assertEqual(json.loads(body)['feedbackUrl'], 'https://www.wjx.top/m/93298004.aspx')
-        self.assertNotIn(b'do-not-publish', self.request('/config.js')[1])
-        self.assertEqual(self.request(method='PUT', data=legacy)[0], 400)
-        self.assertEqual(self.request(method='PUT', data={**self.initial, 'feedbackUrl': ''})[0], 200)
-        self.assertEqual(json.loads(self.request()[1])['feedbackUrl'], '')
+        self.assertEqual(json.loads(body)['feedbackUrl'], '/feedback/')
+        self.assertNotIn(b'private-marker', self.request('/config.js')[1])
+        self.assertNotIn(b'wjx.top', self.request('/config.js')[1])
 
     def test_errors_and_methods(self):
-        self.assertEqual(self.request(method='PUT', data={'bookingUrl': 'x' * 17000})[0], 413)
+        self.assertEqual(self.request(method='PUT', data={'emergencyQQ': 'x' * 17000})[0], 413)
         self.assertEqual(self.request(method='POST')[0], 405)
         self.assertEqual(self.request('/config.js', method='PUT', data=self.initial)[0], 405)
         self.assertEqual(self.request('/_gb-settings/private')[0], 404)

@@ -4,6 +4,9 @@ import json
 import hashlib
 import shutil
 import zipfile
+import os
+import re
+from urllib.parse import urlsplit
 
 from release import FILES, ROOT, validate
 
@@ -20,10 +23,29 @@ def build():
         shutil.copyfile(ROOT / name, destination)
     for name in ('404.html', '_headers', 'robots.txt', 'sitemap.xml'):
         shutil.copyfile(ROOT / 'cloudflare' / name, output / name)
+    source = (output / 'config.js').read_text(encoding='utf-8')
+    config = {key: json.loads(re.search(rf'{key}\s*:\s*("(?:[^"\\]|\\.)*")', source)[1])
+              for key in ('emergencyQQ', 'bookingUrl', 'feedbackUrl', 'apiBaseUrl', 'dataAdminUrl')}
+    branch = os.environ.get('CF_PAGES_BRANCH', 'main')
+    default_api = config['apiBaseUrl'] if branch == 'main' else 'https://47.120.64.37/_gb-preview/api/v1'
+    api_base = os.environ.get('GEEKBIRD_API_BASE_URL', default_api).rstrip('/')
+    if api_base:
+        parsed = urlsplit(api_base)
+        assert parsed.hostname and not parsed.username and not parsed.password and not parsed.query and not parsed.fragment
+        assert parsed.scheme == 'https' or (parsed.scheme == 'http' and parsed.hostname in ('localhost', '127.0.0.1'))
+        assert parsed.path.endswith('/api/v1'), 'API address must end in /api/v1'
+        # Preview paths can have their own protected management prefix.
+        config['dataAdminUrl'] = api_base[:-len('/api/v1')] + '/_gb-data/'
+    else:
+        config['dataAdminUrl'] = ''
+    config.update(schemaVersion=2, apiBaseUrl=api_base, isPreview=branch != 'main' or api_base != 'https://47.120.64.37/api/v1')
+    (output / 'config.js').write_text('window.GEEKBIRD_CONFIG = Object.freeze(' + json.dumps(config, ensure_ascii=False) + ');\n', encoding='utf-8')
     html = (ROOT / 'cloudflare/admin.html').read_text(encoding='utf-8')
     worker = (ROOT / 'cloudflare/worker.js').read_text(encoding='utf-8')
     assert worker.count('"__ADMIN_HTML__"') == 1
-    (output / '_worker.js').write_text(worker.replace('"__ADMIN_HTML__"', json.dumps(html, ensure_ascii=False)), encoding='utf-8')
+    assert worker.count('"__PUBLIC_CONFIG__"') == 1
+    worker = worker.replace('"__ADMIN_HTML__"', json.dumps(html, ensure_ascii=False)).replace('"__PUBLIC_CONFIG__"', json.dumps(config, ensure_ascii=False))
+    (output / '_worker.js').write_text(worker, encoding='utf-8')
     (output / '_routes.json').write_text(json.dumps({
         'version': 1,
         'include': ['/config.js', '/_*'],

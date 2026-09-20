@@ -3,13 +3,8 @@
   const config = window.GEEKBIRD_CONFIG || {};
   function bindLinks(key, label, statusSelector) {
     let href = '';
-    try {
-      const value = config[key];
-      const url = new URL(value);
-      if (typeof value === 'string' && value.length <= 4096 && !/\s/.test(value.trim()) &&
-          ['http:', 'https:'].includes(url.protocol) && url.origin !== location.origin &&
-          !url.username && !url.password) href = url.href;
-    } catch { /* Invalid configuration is handled below. */ }
+    const route = key === 'bookingUrl' ? '/booking/' : '/feedback/';
+    if (config[key] === route) href = route;
     const message = `${label}入口暂未开放，可以先通过 QQ 联系我们。`;
     document.querySelectorAll(`[data-config-link="${key}"]`).forEach(link => {
       if (href) {

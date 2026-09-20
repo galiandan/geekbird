@@ -1,5 +1,6 @@
 // Cloudflare Pages advanced-mode Worker. HTML is embedded by scripts/cloudflare.py.
 const ADMIN_HTML = "__ADMIN_HTML__";
+const SITE_DEFAULTS = "__PUBLIC_CONFIG__";
 const ADMIN_PATH = '/_gb-settings';
 const KEY = 'site-config';
 
@@ -34,42 +35,23 @@ async function authenticated(request, password) {
   return difference === 0;
 }
 
-function validate(value, origin) {
-  const keys = ['emergencyQQ', 'bookingUrl', 'feedbackUrl'];
-  if (!value || keys.some(key => typeof value[key] !== 'string')) {
-    throw new Error('请填写 QQ 号、预约和反馈链接。');
+function validate(value) {
+  if (!value || value.schemaVersion !== 2 || typeof value.emergencyQQ !== 'string' ||
+      Object.keys(value).some(key => !['schemaVersion', 'emergencyQQ'].includes(key))) {
+    throw new Error('设置页面已更新，请刷新后再保存。');
   }
-  const config = Object.fromEntries(keys.map(key => [key, value[key].trim()]));
-  if (config.emergencyQQ && !/^[1-9]\d{4,14}$/.test(config.emergencyQQ)) throw new Error('QQ 号应为 5–15 位数字，且不能以 0 开头。');
-  for (const key of ['bookingUrl', 'feedbackUrl']) {
-    const link = config[key];
-    if (!link) continue;
-    let url;
-    try { url = new URL(link); } catch { throw new Error('请填写完整的 http:// 或 https:// 链接。'); }
-    if (!['http:', 'https:'].includes(url.protocol) || [new URL(origin).hostname, 'geekbird.org', 'www.geekbird.org'].includes(url.hostname) || url.username || url.password || link.length > 4096 || /\s/.test(link)) {
-      throw new Error('请使用外部平台的 HTTP(S) 链接，不要包含账号密码。');
-    }
-  }
-  return config;
+  const emergencyQQ = value.emergencyQQ.trim();
+  if (emergencyQQ && !/^[1-9]\d{4,14}$/.test(emergencyQQ)) throw new Error('QQ 号应为 5–15 位数字，且不能以 0 开头。');
+  return { schemaVersion: 2, emergencyQQ };
 }
 
 async function readConfig(request, env) {
   const saved = await env.SITE_CONFIG.get(KEY, 'json');
-  if (saved !== null && Object.hasOwn(saved, 'feedbackUrl')) return validate(saved, new URL(request.url).origin);
-  // Keep the existing configuration until the first successful save.
-  const asset = await env.ASSETS.fetch(new Request(new URL('/config.js', request.url)));
-  if (!asset.ok) throw new Error('Initial configuration is unavailable');
-  const source = await asset.text();
-  const read = key => {
-    const match = source.match(new RegExp(key + '\\s*:\\s*("(?:[^"\\\\]|\\\\.)*")'));
-    if (!match) throw new Error('Initial configuration is invalid');
-    return JSON.parse(match[1]);
-  };
-  // Only missing legacy fields inherit defaults; an explicit blank stays disabled.
-  const config = saved === null
-    ? { emergencyQQ: read('emergencyQQ'), bookingUrl: read('bookingUrl'), feedbackUrl: read('feedbackUrl') }
-    : { ...saved, feedbackUrl: read('feedbackUrl') };
-  return validate(config, new URL(request.url).origin);
+  if (saved === null) return SITE_DEFAULTS;
+  if (!saved || typeof saved !== 'object' || ![undefined, 2].includes(saved.schemaVersion)) throw new Error('Invalid configuration');
+  // Legacy URLs cannot override the built site routes or API endpoint.
+  const value = validate({ schemaVersion: 2, emergencyQQ: saved.emergencyQQ });
+  return { ...SITE_DEFAULTS, ...value };
 }
 
 export default {
@@ -125,7 +107,7 @@ export default {
         config = validate(JSON.parse(new TextDecoder().decode(body)), url.origin);
       } catch (error) { return response(JSON.stringify({ error: error instanceof SyntaxError ? '提交内容格式不正确。' : error.message }), 400); }
       await env.SITE_CONFIG.put(KEY, JSON.stringify(config));
-      return response(JSON.stringify(config));
+      return response(JSON.stringify({ ...SITE_DEFAULTS, ...config }));
     } catch {
       return response('{"error":"配置暂时无法读取或保存，请稍后重试。"}', 503);
     }

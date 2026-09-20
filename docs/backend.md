@@ -1,0 +1,154 @@
+# 自建后端：运行、验收与切换
+
+本分支已实现 FastAPI + SQLite 业务服务、站内表单、管理工作台、隔离预览环境及部署工具。设计和字段依据见 [方案文档](backend-plan.md)。下文记录实际运行约定，不包含密码。
+
+## 当前部署状态
+
+2026-09-20，已通过 SSH key 将 API 部署到 `47.120.64.37`。正式前端仍以当前 Pages 生产部署为准；本分支尚需通过 Pages 生产切换才能替换官网外部问卷入口。
+
+本次发布目录为 `/opt/geekbird-api/releases/20260920T010801Z`，上一版为 `20260920T010613Z`。29 项业务 API 测试、25 项前端/Worker 测试、5 项 VPS 配置测试通过；本地和真实远端 HTTPS 的桌面/手机浏览器流程均已验收。IP 证书的 `certbot renew --dry-run` 成功，实际每日备份与完整性检查已执行。
+
+| 项目 | 正式业务 | 隔离预览 |
+| --- | --- | --- |
+| API | `https://47.120.64.37/api/v1` | `https://47.120.64.37/_gb-preview/api/v1` |
+| 工作台 | `https://47.120.64.37/_gb-data/` | `https://47.120.64.37/_gb-preview/_gb-data/` |
+| systemd 服务 | `geekbird-api` | `geekbird-api-preview` |
+| 回环端口 | 8766 | 8767 |
+| 系统用户 | `geekbird-api` | `geekbird-preview` |
+| 数据目录 | `/var/lib/geekbird-api` | `/var/lib/geekbird-preview` |
+| 配置目录 | `/etc/geekbird-api` | `/etc/geekbird-preview` |
+| 接收状态 | 首次上线保持关闭，切换官网前核对并开放 | 已开放，限虚构测试资料 |
+
+原 `geekbird-admin` 配置服务仍使用 8765。现有 VPS 静态站和 Cloudflare 生产页面不通过本次 API 部署自动升级。
+
+数据库文件名均为 `geekbird.sqlite3`，父目录权限 0700。初次部署生成独立的 `admin` 账号密码，保存在各配置目录下的 `credential.password`，仅 root 可读。应用只读取 `credential.json` 中的带盐 scrypt 摘要。密码文件不进 Git，也不在管理页面显示。
+
+登录工作台前，可在自己的终端通过 SSH 读取对应密码文件。妥善保存到密码管理器后，可移除明文文件；应用运行只需要摘要文件。部署脚本不会重新生成已存在的账号摘要。
+
+## 代码与配置
+
+- `server/api/models.py`：公开表单与管理更新的字段约束。
+- `server/api/db.py`、`migrations/001_initial.sql`：明确字段、事务、重复提交、版本冲突和操作记录。
+- `server/api/app.py`：JSON API、跨域、身份验证、错误处理和 CSV 导出。
+- `server/api/admin.html`、`admin.js`：受保护的工作台。
+- `server/api/manage.py`：迁移、密码、在线备份与到期清理。
+- `scripts/api.py`：只打包私有 API 与部署配置。
+- `scripts/deploy_api.py`：校验包、准备虚拟环境、备份、迁移、切换、健康检查；失败时恢复原 Nginx 配置和可用的旧应用版本。
+
+应用从配置目录的 `api.env` 读取：
+
+```text
+GB_DATABASE=/var/lib/geekbird-api/geekbird.sqlite3
+GB_CREDENTIAL=/etc/geekbird-api/credential.json
+GB_ADMIN_ORIGIN=https://47.120.64.37
+GB_ALLOWED_ORIGINS=https://geekbird.org
+```
+
+预览环境使用自己的路径和明确的 Pages 分支 origin，正式环境不允许 Pages 预览或本地来源。配置修改后重启相应服务。CORS 的 Nginx map 也需同步更改；不要加入通配域。
+
+API 接收开关保存在数据库，由工作台控制，不从 Cloudflare KV 读取。管理写入需 Basic 身份验证、正确的 `Origin`、`X-GB-Request: records` 和 JSON 正文；管理接口不开放 CORS。API 文档与公开记录查询均关闭。
+
+公开 POST 要求随机 UUID v4 `Idempotency-Key`。同键同内容返回原编号，不重复写入；同键不同内容返回 409。状态/时长更新需要记录版本，旧版本不会覆盖新修改。请求正文最多 32 KiB；Nginx 每 IP 每分钟允许 6 次公开 POST，短时允许 3 次突发，GET 和预检不占此配额。
+
+## 本地验证
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install -r server/api/requirements-dev.txt
+npm ci
+python3 scripts/cloudflare.py
+.venv/bin/python -m pytest tests/test_api.py -q
+python3 -m unittest discover -s tests -p test_vps.py
+npm test
+npx playwright install chromium
+.venv/bin/python tests/run_browser.py
+```
+
+`tests/run_browser.py` 使用临时数据库与测试密码，在 `127.0.0.1:8790`、`127.0.0.1:8800` 启动接口和静态站；结束后停止服务并清理数据。测试前确保两个端口空闲。截图默认保存到 `/tmp/geekbird-browser-results/`。
+
+如果 Node 或 Playwright 使用其他安装路径，可以设置 `GEEKBIRD_NODE`、`GEEKBIRD_PLAYWRIGHT_MODULE`，必要时用 `GB_BROWSER_EXECUTABLE` 指向现有 Chromium。这些是本地工具选项，不进入构建配置。
+
+已覆盖的关键行为包括：
+
+- 预约和反馈字段校验，旧说明版本、未来日期、非整数评分、异常时长与额外管理字段的拒绝。
+- 8 个并发相同请求只产生一条记录；丢失回执后的浏览器重试返回同一编号。
+- 暂停接收、重新开放、接口故障与超时保留输入；已经成功入库的请求仍能取得原回执。
+- 管理员鉴权、跨站写入拦截、状态流转、并发修改冲突和操作日志。
+- 原始填报时长与确认时长分开保存；CSV 导出处理公式注入。
+- 备份完整性、恢复后能读取记录、到期清理及个人字段移除。
+- 桌面和手机表单、后台处理、时长核实、下载和暂停提示。
+
+`tests/browser-smoke.mjs` 也支持连接隔离的远端预览 API。设置 `GB_BROWSER_ASSETS` 时，它在浏览器内提供本地构建资源，以验证真实 HTTPS 和跨域提交；这种验收不是 Cloudflare 发布，不能把该测试 origin 宣称为已上线预览地址。
+
+## 后端部署
+
+本地执行：
+
+```sh
+python3 scripts/deploy_api.py
+```
+
+默认目标为 `root@47.120.64.37`。部署使用新目录 `/opt/geekbird-api/releases/<UTC 时间>/`，每个目录包含自己的虚拟环境与依赖；`/opt/geekbird-api/current` 指向当前版本。`previous-release.txt`、`previous-nginx.conf` 位于私有发布目录，可用于核对回滚。
+
+Nginx 新配置位于 `/etc/nginx/conf.d/geekbird-api.conf` 与 `/etc/nginx/snippets/geekbird-api-*.conf`，只在现有 HTTPS server 中新增代理路由，保留原 ACME 验证与网站路由。公开 API 的 413、429、502/504 错误会返回 JSON，并保留匹配来源的跨域响应头。
+
+已有数据库在迁移前备份到 `/var/backups/<环境目录>/before-deploy/`。初次建库两个接收开关都为关闭；重复部署不会覆盖原数据、接收开关或密码。当前只有初始 schema 迁移，后续破坏性结构变更必须单独设计兼容与停写步骤。
+
+部署后在服务器检查：
+
+```sh
+systemctl status geekbird-api geekbird-api-preview
+systemctl list-timers geekbird-api-backup.timer geekbird-cert-renew.timer
+nginx -t
+curl -fsS https://47.120.64.37/api/v1/health
+curl -fsS https://47.120.64.37/api/v1/meta
+```
+
+修改密码在服务器交互式执行，不把密码放进命令参数：
+
+```sh
+cd /opt/geekbird-api/current
+venv/bin/python -m api.manage set-password --output /etc/geekbird-api/credential.json
+chown root:geekbird-api /etc/geekbird-api/credential.json
+chmod 640 /etc/geekbird-api/credential.json
+systemctl restart geekbird-api
+```
+
+轮换后删除或替换旧的 `credential.password`，避免将初始密码误当成新密码。预览密码使用其独立目录和服务。
+
+## 每日备份与到期清理
+
+`geekbird-api-backup.timer` 每天北京时间 03:00 左右运行。先使用 SQLite backup API 生成完整副本，执行 `integrity_check`，保留 14 份日常备份，并清理 `daily`、`manual`、`before-deploy` 中超过 14 天的副本；成功后清理完成/取消或核实/无效超过 180 天的个人信息。清理记录保留已使用幂等键标记，旧请求不会被当作新申请。
+
+备份目录为 `/var/backups/geekbird-api/daily/`，不属于网站目录。预览库只用于测试，不启用正式每日备份任务；部署前仍保留独立快照。日志保留 14 天，访问日志不包含请求正文和查询字符串，应用不记录密码或提交内容。
+
+手动备份与查看清理数量：
+
+```sh
+cd /opt/geekbird-api/current
+venv/bin/python -m api.manage backup --directory /var/backups/geekbird-api/manual
+venv/bin/python -m api.manage purge
+```
+
+`purge` 默认只统计，传入 `--apply` 才执行。日常备份任务执行失败时不会继续清理，需从 `journalctl -u geekbird-api-backup` 查看并处理。IP 短期证书仍由原 `geekbird-cert-renew.timer` 自动续期，不能关闭 ACME 验证路径。
+
+这些备份在同一台服务器，尚无异机容灾或自动通知渠道。整机丢失不在本机备份保护范围内；离机备份目的地需要另行配置。
+
+## 恢复与回滚
+
+恢复数据库前先关闭接收并停止业务服务，在私有目录保留当前数据库及同名 WAL/SHM 文件。把选定备份复制到新的临时文件，执行 SQLite `integrity_check`，确认迁移版本，再恢复为状态目录中的 `geekbird.sqlite3`；所有者为对应服务用户，权限 0600，父目录 0700。不要让旧 WAL 文件与恢复文件混用。
+
+启动服务后先检查记录数、关联和到期信息清理，再开放接收。旧备份可能包含已经到期的资料，恢复后应重新执行相应清理。恢复数据库可能回退最近的业务数据，应保留故障现场以便补回。
+
+程序回滚可把 `current` 切回 `previous-release.txt` 所指版本，然后重启 API；必须确认该代码兼容当前 schema。不要为回滚代码直接覆盖数据库。涉及 Nginx 变更时恢复对应备份并 `nginx -t` 后重载。
+
+前端与数据库独立部署。Pages 回滚不会回滚 KV；旧页面依赖旧配置结构，需要同时恢复对应 `site-config` 备份。具体生产切换步骤见 [Cloudflare 迁移说明](cloudflare.md)。
+
+## 生产前端切换条件
+
+1. 在 Pages 中核实 `geekbird` 项目的 Git 连接、生产分支和构建输出。仓库另有 `geektest` Workers Builds 检查，不能据此判断 Pages 已自动部署。
+2. 核对旧 KV 中原本关闭的入口，在正式业务工作台保持相应关闭；其余按实际接收安排开放。
+3. 用独立预览验收后发布本分支前端，确认其 `apiBaseUrl` 指向正式 API，页面没有测试提示。
+4. 在官网提交明确标记的测试记录并核对后台，检查所有旧外链入口、页面说明与失败提示。历史问卷答卷单独保留或另行导入。
+
+截至本次后端部署，正式 API 接收仍关闭，源码和发布包已具备切换能力；Git 分支 push 与 Pages 正式发布是两个独立结果。

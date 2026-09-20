@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 const base = 'http://127.0.0.1:8788';
 const auth = 'Basic ' + Buffer.from('admin:local-test-password-only').toString('base64');
 const hash = data => createHash('sha256').update(data).digest('hex');
-for (const [route, name] of [['/', 'index.html'], ['/service/', 'service/index.html'], ['/disclaimer/', 'disclaimer/index.html'], ['/booking/', 'booking/index.html'], ['/assets/app.js', 'assets/app.js']]) {
+for (const [route, name] of [['/', 'index.html'], ['/service/', 'service/index.html'], ['/disclaimer/', 'disclaimer/index.html'], ['/booking/', 'booking/index.html'], ['/feedback/', 'feedback/index.html'], ['/assets/app.js', 'assets/app.js']]) {
   const result = await fetch(base + route);
   assert.equal(result.status, 200, route);
   assert.equal(hash(Buffer.from(await result.arrayBuffer())), hash(await readFile(new URL('../dist/cloudflare/' + name, import.meta.url))), route);
@@ -33,16 +33,16 @@ async function save(config, origin = base) {
   }, body: JSON.stringify(config) });
 }
 try {
-  const changed = { emergencyQQ: '123456789', bookingUrl: 'https://booking.example/form?from=smoke', feedbackUrl: 'https://feedback.example/form?from=smoke' };
+  const changed = { schemaVersion: 2, emergencyQQ: '123456789' };
   assert.equal((await save(changed)).status, 200);
   const publicConfig = await fetch(base + '/config.js');
   assert.equal(publicConfig.status, 200);
   assert.equal(publicConfig.headers.get('Cache-Control'), 'no-store');
-  assert.ok((await publicConfig.text()).includes(JSON.stringify(changed)));
+  assert.ok((await publicConfig.text()).includes('123456789'));
   assert.equal((await save(original, 'https://evil.example')).status, 403);
   assert.equal((await save({ ...changed, bookingUrl: 'javascript:alert(1)' })).status, 400);
 } finally {
-  assert.equal((await save(original)).status, 200, 'Restore local test configuration');
+  assert.equal((await save({ schemaVersion: 2, emergencyQQ: original.emergencyQQ })).status, 200, 'Restore local test configuration');
 }
 assert.match(await (await fetch(base + '/sitemap.xml')).text(), /https:\/\/geekbird\.org\/disclaimer\//);
 assert.ok(!(await (await fetch(base + '/robots.txt')).text()).includes('_gb-settings'));

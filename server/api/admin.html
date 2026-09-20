@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive"><title>服务工作台 · 极客鸟</title>
+  <style>
+    :root{color-scheme:dark;font:15px/1.7 system-ui,sans-serif;color:#e8eeea;background:#0c1110}*{box-sizing:border-box}body{margin:0;padding:32px 20px}main{max-width:1200px;margin:auto}header,.toolbar,.pager{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}header{border-bottom:1px solid #35403b;padding-bottom:24px}h1{font-size:30px;font-weight:500;margin:28px 0 8px}h2{font-size:20px;font-weight:500}a{color:#cfdfab}button,input,select,textarea{font:inherit}button,a.button{cursor:pointer;padding:10px 18px;border:1px solid #596c52;border-radius:6px;background:#c8dcac;color:#182014;text-decoration:none}button:disabled{opacity:.45;cursor:wait}input,select,textarea{border:1px solid #475a4c;border-radius:5px;background:#151e18;color:inherit;padding:9px;width:100%}textarea{min-height:100px;resize:vertical}label{display:block;margin:14px 0}label span{display:block;margin-bottom:6px}input[type=checkbox]{width:auto}fieldset{border:0;padding:0;margin:0;min-width:0}.toolbar{align-items:end;margin:24px 0}.toolbar label{flex:1;min-width:140px;margin:0}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:650px}th,td{padding:14px 12px;border-bottom:1px solid #303e32;text-align:left;vertical-align:top}td{overflow-wrap:anywhere}th{color:#adbaae;font-weight:500}.muted{color:#a4b3a7}.pager{margin:20px 0}#message{min-height:2em}#message[data-error=true]{color:#ffb3a6}details{background:#131c16;border:1px solid #334536;padding:18px;border-radius:8px;margin-top:32px}summary{cursor:pointer}dialog{width:min(850px,94vw);max-height:90vh;border:1px solid #526647;border-radius:10px;background:#101a13;color:inherit;padding:26px}dialog::backdrop{background:#000b}dl{display:grid;grid-template-columns:130px 1fr;gap:10px 20px}dt{color:#9cb197}dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}pre{white-space:pre-wrap;font:13px/1.8 system-ui}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #d7f0a4;outline-offset:3px}[hidden]{display:none!important}@media(max-width:650px){body{padding:20px 14px}.grid{grid-template-columns:1fr;gap:0}dl{grid-template-columns:1fr;gap:4px}dd{margin-bottom:14px}dialog{padding:18px}}
+  </style>
+  <script defer src="admin.js"></script>
+</head>
+<body><main>
+  <header><span>GEEKBIRD / 服务工作台</span><a href="https://geekbird.org/" target="_blank" rel="noopener noreferrer">查看官网 ↗</a></header>
+  <h1>每一次求助，都有回音。</h1><p class="muted">查看预约、跟进服务、核实反馈。填报时长需核对后确认，多人服务不自动重复计时。</p>
+  <form id="filters" class="toolbar">
+    <label><span>记录</span><select id="kind"><option value="bookings">维修预约</option><option value="feedback">服务反馈</option></select></label>
+    <label><span>状态</span><select id="filter-status"></select></label>
+    <label><span>开始日期（北京时间）</span><input type="date" id="start"></label>
+    <label><span>结束日期</span><input type="date" id="end"></label>
+    <button type="submit">查询</button><button type="button" id="export">导出 CSV</button>
+  </form>
+  <p id="message" role="status" aria-live="polite"></p>
+  <div class="table-wrap"><table><thead><tr><th>编号 / 提交时间</th><th>姓名 / 专业</th><th>状态</th><th>设备 / 志愿者</th><th>操作</th></tr></thead><tbody id="rows"></tbody></table></div>
+  <div class="pager"><button id="previous" type="button">上一页</button><span id="count"></span><button id="next" type="button">下一页</button></div>
+  <details><summary>预约与反馈接收设置</summary><form id="settings"><fieldset id="settings-fields" disabled>
+    <label><input type="checkbox" id="accept-booking"> 接收新的预约</label>
+    <label><input type="checkbox" id="accept-feedback"> 接收新的反馈</label>
+    <label><span>暂停时向访客显示</span><input id="closed-message" maxlength="300" required></label>
+    <button type="submit">保存接收设置</button><button type="button" id="reload-settings">重新读取</button>
+  </fieldset></form></details>
+  <p class="muted">管理结束后请关闭专用隐私窗口。记录与导出文件包含个人信息，请按保留规则妥善管理。</p>
+  <dialog id="detail" aria-labelledby="detail-title">
+    <header><h2 id="detail-title">记录详情</h2><button type="button" id="close-detail">关闭</button></header>
+    <dl id="record-data"></dl>
+    <form id="update"><fieldset id="update-fields"><div class="grid">
+      <label><span>处理状态</span><select id="record-status"></select></label>
+      <label id="hours-label"><span>确认时长（小时）</span><input type="number" id="hours" min="0" max="5" step="0.01"></label>
+    </div>
+    <label id="association-label"><span>关联预约内部 ID（选填，可从预约详情复制）</span><input id="association" maxlength="36"></label>
+    <label><span>内部备注</span><textarea id="notes" maxlength="4000"></textarea></label>
+    <label><span>本次操作原因（取消、重开、无效或不计时长时必填）</span><input id="reason" maxlength="500"></label>
+    <button type="submit">保存处理结果</button><button type="button" id="reload-detail">重新读取记录</button>
+    </fieldset></form><p id="detail-message" role="status"></p>
+    <h2>操作记录</h2><div id="events"></div>
+  </dialog>
+</main></body></html>

@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily GeekBird database backup
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Asia/Shanghai
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

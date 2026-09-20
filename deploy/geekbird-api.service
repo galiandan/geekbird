@@ -1,0 +1,23 @@
+[Unit]
+Description=GeekBird booking and feedback API
+After=network.target
+
+[Service]
+Type=simple
+User=geekbird-api
+Group=geekbird-api
+WorkingDirectory=/opt/geekbird-api/current
+EnvironmentFile=/etc/geekbird-api/api.env
+ExecStart=/opt/geekbird-api/current/venv/bin/uvicorn api.app:create_app --factory --host 127.0.0.1 --port 8766 --proxy-headers --forwarded-allow-ips=127.0.0.1 --no-access-log
+Restart=on-failure
+StateDirectory=geekbird-api
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/geekbird-api
+
+[Install]
+WantedBy=multi-user.target

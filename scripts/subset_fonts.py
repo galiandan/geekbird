@@ -28,7 +28,7 @@ def main():
     content = Text()
     for name in PAGES:
         content.feed((ROOT / name).read_text(encoding='utf-8'))
-    text = ''.join(content.parts) + (ROOT / 'assets/app.js').read_text(encoding='utf-8')
+    text = ''.join(content.parts) + ''.join((ROOT / name).read_text(encoding='utf-8') for name in ('assets/app.js', 'assets/forms.js'))
     chinese = ''.join(sorted({char for char in text if ord(char) > 127}))
     latin = ''.join(chr(code) for code in range(32, 127))
     folder = ROOT / 'assets/fonts'

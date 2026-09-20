@@ -1,0 +1,15 @@
+[Unit]
+Description=Back up GeekBird database and check integrity
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/geekbird-api/current
+ExecStart=/opt/geekbird-api/current/venv/bin/python -m api.manage --database /var/lib/geekbird-api/geekbird.sqlite3 backup --directory /var/backups/geekbird-api/daily --prune-root /var/backups/geekbird-api
+ExecStartPost=/opt/geekbird-api/current/venv/bin/python -m api.manage --database /var/lib/geekbird-api/geekbird.sqlite3 purge --apply
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/geekbird-api /var/backups/geekbird-api

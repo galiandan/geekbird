@@ -3,28 +3,26 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const booking = 'https://www.wjx.top/m/93277562.aspx';
-const feedback = 'https://www.wjx.top/m/93298004.aspx';
+const booking = '/booking/';
+const feedback = '/feedback/';
 const source = readFileSync(new URL('../assets/app.js', import.meta.url), 'utf8');
 const configSource = readFileSync(new URL('../config.js', import.meta.url), 'utf8');
 
-test('default reservation goes straight to the booking form', () => {
+test('default reservation and feedback use site forms', () => {
   const context = { window: {} };
   vm.runInNewContext(configSource, context);
   assert.equal(context.window.GEEKBIRD_CONFIG.bookingUrl, booking);
   assert.equal(context.window.GEEKBIRD_CONFIG.feedbackUrl, feedback);
 });
 
-for (const file of ['index.html', 'service/index.html', 'disclaimer/index.html', 'booking/index.html']) {
-  test(`${file} exposes direct booking and feedback links without an intermediate page`, () => {
+for (const file of ['index.html', 'service/index.html', 'disclaimer/index.html', 'booking/index.html', 'feedback/index.html']) {
+  test(`${file} exposes the configured internal booking and feedback entries`, () => {
     const html = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
     const anchors = html.match(/<a\b[^>]*>/g);
-    assert.ok(!anchors.some(tag => tag.includes('href="/booking/"')));
     const reservations = anchors.filter(tag => tag.includes('data-config-link="bookingUrl"'));
-    assert.ok(reservations.length >= 3);
-    assert.ok(!html.includes(booking) && !html.includes(feedback));
+    assert.ok(reservations.length >= 2);
     assert.ok(reservations.every(tag => !tag.includes('href=')));
-    assert.ok(anchors.some(tag => tag.includes('data-config-link="feedbackUrl"') && tag.includes('button')));
+    if (file !== 'feedback/index.html') assert.ok(anchors.some(tag => tag.includes('data-config-link="feedbackUrl"')));
     assert.match(html, /id="booking-status"/);
   });
 }
@@ -54,11 +52,11 @@ function render(bookingUrl, withStatus = true, feedbackUrl) {
 }
 
 test('configuration updates every booking entry, not just the first', () => {
-  const url = 'https://booking.example/new-form';
+  const url = booking;
   assert.ok(render(url).links.every(link => link.href === url));
 });
 
-for (const value of ['', undefined, 'not a url', 'javascript:alert(1)', 'http://localhost:8080/booking/']) {
+for (const value of ['', undefined, 'not a url', 'javascript:alert(1)', 'http://localhost:8080/booking/', 'https://www.wjx.top/m/93277562.aspx']) {
   test(`invalid or disabled booking (${value}) disables every entry and shows status`, () => {
     const { links, status } = render(value);
     assert.ok(links.every(link => !link.href && link.attributes['aria-disabled'] === 'true'));
@@ -72,7 +70,7 @@ test('missing optional status does not break contact initialization', () => {
 });
 
 test('feedback uses its own configured address and does not depend on booking', () => {
-  const url = 'https://feedback.example/new-form';
+  const url = feedback;
   const result = render('', true, url);
   assert.ok(result.feedbackLinks.every(link => link.href === url && !link.attributes['aria-disabled']));
   assert.equal(result.feedbackStatus.hidden, true);

@@ -1,105 +1,67 @@
 # 极客鸟 GeekBird
 
-极客鸟官网已正式上线：**<https://geekbird.org/>**。
+极客鸟官网：**<https://geekbird.org/>**。让设备多用一天，让热爱多走一程。
 
-一个志愿电脑维修组织的网站。让设备多用一天，让热爱多走一程。
+本分支 `feat/self-hosted-booking-backend` 实现站内预约、服务反馈与自建业务后台。静态网页继续部署在 Cloudflare Pages；表单通过 HTTPS 提交到 `47.120.64.37` 上的 FastAPI 服务，数据保存在本机 SQLite。正式网站的切换与分支开发分别进行。
 
-网站使用原生 HTML、CSS 与 JavaScript，部署于 Cloudflare Pages。预约与服务反馈直接打开外部问卷星表单；联系 QQ、预约和反馈链接可通过密码保护的后台维护，配置保存在 Cloudflare KV。
+## 页面与管理
 
-## 页面与入口
-
-| 页面 | 地址 | 内容 |
-| --- | --- | --- |
-| 首页 | <https://geekbird.org/> | 黑色羽毛主视觉、组织故事与服务入口 |
-| 维修服务 | <https://geekbird.org/service/> | 服务范围、维修理念与预约入口 |
-| 免责声明 | <https://geekbird.org/disclaimer/> | 建筑光井主视觉；服务范围、备份、维修风险、授权、隐私与责任说明 |
-
-免责声明是第三个主页面，可从各页导航及页脚进入。预约按钮直接打开配置的外部表单，无需经过站内中转页；旧 `/booking/` 地址仅保留兼容，不出现在主导航或站点地图中，也不参与搜索收录。本站没有预约表单或提交接口。
-
-默认外部入口：
-
-- 预约维修：<https://www.wjx.top/m/93277562.aspx>。
-- 服务反馈：<https://www.wjx.top/m/93298004.aspx>。
-
-## 日常管理
-
-管理后台：<https://geekbird.org/_gb-settings/>。后台不出现在公开导航中，页面与接口均需要身份验证。用户名为 `admin`，密码为 Cloudflare 中设置的 `ADMIN_PASSWORD` Secret。
-
-| 配置 | 用途 |
+| 路径 | 用途 |
 | --- | --- |
-| `emergencyQQ` | 联系 QQ，5–15 位数字；留空显示“QQ 号暂未公布” |
-| `bookingUrl` | 外部预约平台的完整 HTTP(S) 地址；留空暂停预约入口 |
-| `feedbackUrl` | 外部反馈表单的完整 HTTP(S) 地址；留空暂停反馈入口 |
+| `/`、`/service/`、`/disclaimer/` | 首页、服务与信息使用说明 |
+| `/booking/` | 站内维修申请，提交后给出编号，等待志愿者联系 |
+| `/feedback/` | 服务反馈、三个维度评分及志愿时长填报 |
+| `https://geekbird.org/_gb-settings/` | Cloudflare 配置后台，维护公开联系 QQ |
+| `https://47.120.64.37/_gb-data/` | 独立业务后台：查看记录、跟进状态、核实时长、导出 CSV、控制接收 |
 
-首次保存前使用 [config.js](config.js) 中的默认值；保存后以 KV 配置为准，重新部署不会覆盖。保存后稍后刷新网站验证，KV 全球同步通常需要约 1 分钟，部分地区可能更久。
+业务后台用户名为 `admin`，密码与 Cloudflare 设置后台独立。部署生成的密码保存在服务器 `/etc/geekbird-api/credential.password`，仅 root 可读。密码和数据库不会进入源码或静态发布包。
 
-若后台仍保存旧公众号链接，需要在后台将预约地址更新为实际表单。旧记录仅缺少 `feedbackUrl` 时，会读取源码默认反馈地址；已保存的自定义值或空字符串不会被覆盖。旧管理页需刷新后再保存全部三个字段。
+预约代表服务申请，具体安排需联系确认。反馈保留用户填报时长，由管理员另行核实确认；不自动给多人重复计时。首版不含账号注册、自动排班、图片上传或自动通知。
 
-QQ 与表单链接是公开配置；管理密码不写入源码。HTML 通过 `data-config-link` 声明配置键，由 `assets/app.js` 统一绑定地址；未配置或无效时禁用对应入口并提示。未启用 JavaScript 时显示启用提示。
+## 本地检查
 
-## 本地预览与检查
-
-本地预览公开页面：
-
-```sh
-python3 -m http.server 8080 --bind 127.0.0.1
-```
-
-打开 <http://127.0.0.1:8080/>。静态预览使用源码配置，不运行后台或 KV。
-
-修改中文文案后，先更新本地字体子集：
+需要 Python 3.11+、Node.js 22+；静态构建本身只需 Python 标准库。
 
 ```sh
-python3 scripts/subset_fonts.py
-```
-
-字体更新需要联网；网页使用本地字体文件，访客无需连接外部字体服务。
-
-发布前检查与构建：
-
-```sh
+python3 -m venv .venv
+.venv/bin/pip install -r server/api/requirements-dev.txt
+npm ci
 python3 scripts/cloudflare.py
-node --test tests/*.test.mjs
+.venv/bin/python -m pytest tests/test_api.py -q
+python3 -m unittest discover -s tests -p test_vps.py
+npm test
+npx playwright install chromium
+.venv/bin/python tests/run_browser.py
 ```
 
-构建仅需 Python 3，测试需要 Node.js 22 或以上。构建会检查页面链接、锚点、图片与配置，并生成 `dist/cloudflare/`、`dist/geekbird-cloudflare-pages.zip` 和 SHA-256 清单。产物包含公开页面、旧地址兼容页及 Pages Worker，不包含密码、VPS 服务、文档或设计源稿。
+浏览器验收脚本自动启动临时数据库、接口和静态服务器，验证桌面、手机、丢失回执后的重试、后台处理、时长核实、导出及暂停接收；结束后清理临时数据。截图默认在 `/tmp/geekbird-browser-results/`。CI 使用相同流程。
 
-## Cloudflare 部署与维护
+只预览页面可运行 `python3 -m http.server 8080 --bind 127.0.0.1`；完整提交测试应使用上面的隔离验收脚本。新增中文文案后运行 `python3 scripts/subset_fonts.py` 更新本地字体。
 
-仓库：`galiandan/geekbird`，生产分支：`main`。Pages 项目使用以下构建配置：
+## 构建与部署
 
-| 设置 | 值 |
-| --- | --- |
-| 框架预设 | `None` |
-| 构建命令 | `python3 scripts/cloudflare.py` |
-| 构建输出目录 | `dist/cloudflare` |
-| 根目录 | 仓库根目录（留空） |
-| 正式自定义域 | `geekbird.org` |
-| Secret | `ADMIN_PASSWORD`，至少 16 位 |
-| KV 绑定 | `SITE_CONFIG`，绑定保存站点配置的命名空间 |
+```sh
+# Cloudflare 静态页面、Worker 和校验清单
+python3 scripts/cloudflare.py
 
-使用 Pages 的 Git 集成时，推送 `main` 会触发构建部署。密码、绑定或环境设置变更后需重新部署；预览环境使用独立 KV，避免影响正式配置。
+# 独立的私有 API 发布包
+python3 scripts/api.py
 
-正式页面 canonical、`robots.txt` 和站点地图均使用 `https://geekbird.org`；站点地图只包含三个主页面。后台响应禁止缓存和搜索收录。回滚 Pages 部署只回滚代码，不会回滚 KV 中保存的配置。
-
-首次配置、`SITE_CONFIG` 未绑定等故障排查，以及本地 Wrangler 验收步骤，见 [Cloudflare 部署说明](docs/cloudflare.md)。历史部署资料见 [VPS 部署记录](docs/vps.md) 与 [Nginx 部署说明](docs/deployment.md)，VPS 与 Cloudflare 的配置和密码互不同步。
-
-## 项目结构
-
-```text
-geekbird/
-├── index.html                 首页
-├── service/index.html         服务页
-├── disclaimer/index.html      免责声明（第三页）
-├── booking/index.html         旧预约地址兼容页
-├── config.js                  初始业务配置
-├── assets/                    统一样式、交互、本地字体、Logo 与背景图
-├── cloudflare/                Pages Worker、管理页、响应头与站点地图
-├── scripts/                   构建、校验、图片导出与字体子集工具
-├── tests/                     预约链接及后台配置测试
-├── docs/                      部署、文案与图片维护说明
-├── design/                    原始设计稿与参考图，不部署
-├── deploy/                    历史 Nginx / systemd 配置
-├── server/                    历史 VPS 配置服务
-└── dist/                      生成的发布产物，不纳入版本管理
+# 通过 SSH 部署 API、预览 API 和每日备份任务
+python3 scripts/deploy_api.py
 ```
+
+Pages 构建命令为 `python3 scripts/cloudflare.py`，输出目录 `dist/cloudflare`。`main` 默认连接正式 API；其他 Pages 分支连接独立预览 API，页面显示测试提示。可以通过构建环境变量 `GEEKBIRD_API_BASE_URL` 覆盖，设为空可禁用提交。
+
+后端初装默认关闭正式接收；在完成验证和旧配置核对后通过业务后台开放，再切换正式前端。预览库与正式库使用不同用户、密码和数据目录。
+
+旧 KV 中的预约/反馈外部链接在新版不再决定入口；站内路径由代码确定，接收开关以服务器数据库为准。联系 QQ 继续从 KV 读取。旧设置页面保存会提示刷新，避免旧结构覆盖新配置。
+
+## 文档
+
+- [后端设计方案](docs/backend-plan.md)：业务字段、架构与实施约定。
+- [后端部署与验收记录](docs/backend.md)：地址、配置、测试、密码管理、备份恢复与回滚。
+- [Cloudflare 构建和迁移](docs/cloudflare.md)：生产/预览分离及旧 KV 迁移。
+- [历史 VPS 部署记录](docs/vps.md)：原网站和配置服务，独立于新业务 API。
+
+项目的 `server/api/`、`deploy/`、测试和文档不属于公开静态资源。不要把整个仓库直接作为网站根目录；使用构建输出。

@@ -11,8 +11,8 @@ import tarfile
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
-PAGES = ("index.html", "service/index.html", "disclaimer/index.html", "booking/index.html")
-FILES = (*PAGES, "config.js", "assets/app.js", "assets/style.css", "assets/logo.svg",
+PAGES = ("index.html", "service/index.html", "disclaimer/index.html", "booking/index.html", "feedback/index.html")
+FILES = (*PAGES, "config.js", "assets/app.js", "assets/forms.js", "assets/forms.css", "assets/style.css", "assets/logo.svg",
          "assets/images/feathers.webp", "assets/images/feathers-mobile.webp",
          "assets/images/landscape.webp", "assets/images/landscape-mobile.webp",
          "assets/images/architecture.webp", "assets/images/architecture-mobile.webp",
@@ -57,7 +57,10 @@ def validate():
     for name in PAGES:
         page = Page()
         page.feed((ROOT / name).read_text(encoding="utf-8"))
-        assert not page.forms, f"Unexpected booking form in {name}"
+        if name in ('booking/index.html', 'feedback/index.html'):
+            assert page.forms, f"Missing service form in {name}"
+        else:
+            assert not page.forms, f"Unexpected form in {name}"
         pages[name] = page
     for name, page in pages.items():
         for link in page.links:
@@ -71,8 +74,8 @@ def validate():
                 assert parts.fragment in pages[target].ids, f"Missing anchor: {name}: {link}"
     for name, page in pages.items():
         assert page.platform_links, f"Missing direct booking links: {name}"
-        assert "/booking/" not in page.links, f"Unexpected intermediate booking link: {name}"
-        assert {link['data-config-link'] for link in page.platform_links} == {'bookingUrl', 'feedbackUrl'}, f"Missing configurable links: {name}"
+        expected = {'bookingUrl'} if name == 'feedback/index.html' else {'bookingUrl', 'feedbackUrl'}
+        assert {link['data-config-link'] for link in page.platform_links} == expected, f"Missing configurable links: {name}"
         for link in page.platform_links:
             assert not link.get('href') and link.get('aria-disabled') == 'true', f"Link must be initialized from config.js: {name}"
     css = "\n".join((ROOT / name).read_text(encoding="utf-8") for name in FILES if name.endswith(".css"))
@@ -96,9 +99,7 @@ def validate():
         link = json.loads(match[1]).strip()
         if not link:
             continue
-        parsed = urlsplit(link)
-        assert parsed.scheme in ("http", "https") and parsed.hostname, f"Configure a valid external {key} before release"
-        assert parsed.hostname not in ("localhost", "127.0.0.1", "47.120.64.37"), f"{key} must point to the external platform"
+        assert link == {'bookingUrl': '/booking/', 'feedbackUrl': '/feedback/'}[key], f"{key} must use the site form"
     assert re.search(r'emergencyQQ\s*:\s*"[1-9][0-9]{4,14}"', config), "Configure a valid contact QQ before release"
     print(f"Checked {len(FILES)} production files, all local references, images and link configuration.")
     return {f"public/{name}": hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in sorted(FILES)}
